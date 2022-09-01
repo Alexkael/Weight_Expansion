@@ -13,6 +13,8 @@ class save_weights(keras.callbacks.Callback):
             os.makedirs(self.fname)
     
     def on_epoch_begin(self, epoch, logs={}):
+        if epoch == 0:
+            self.model.save(self.fname+'/initial.h5')
         if epoch>139:
             K.set_value(self.model.optimizer.add_noise, float(1.0))
             
@@ -28,3 +30,4 @@ class save_weights(keras.callbacks.Callback):
             
         if epoch in [139]:
             self.model.save(self.fname+'/final_'+str(epoch)+'.h5')
+            

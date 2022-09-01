@@ -19,11 +19,17 @@ import tensorflow as tf
 import os
     
 class cifar10vgg:
-    def __init__(self, index,train=True):
+    def __init__(self, lr, dropout_rate, width, batch_size, weight_decay, train=True):
         self.num_classes = 10
+        self.lr = lr
+        self.dropout_rate = dropout_rate
+        self.width = width
+        self.batch_size = batch_size
+        self.weight_decay = weight_decay
+        self.act = 'relu'
+        
         self.x_shape = [32,32,3]
-        self.index = index
-
+        
         self.model = self.build_model()
         if train:
             self.model = self.train(self.model)
@@ -34,88 +40,64 @@ class cifar10vgg:
     def build_model(self):
         # Build the network of vgg for 10 classes with massive dropout and weight decay as described in the paper.
         model = Sequential()
-        weight_decay = 0
-
-        model.add(Conv2D(64, (3, 3), padding='same',
-                         input_shape=self.x_shape))
-        model.add(Activation('relu'))
-        model.add(BatchNormalization())
-        model.add(Dropout(0.3))
-
-        model.add(Conv2D(64, (3, 3), padding='same'))
-        model.add(Activation('relu'))
+        weight_decay = self.weight_decay
+        act = self.act
+        
+        model.add(Conv2D(int(64*self.width), (3, 3), padding='same',
+                         input_shape=self.x_shape,kernel_regularizer=regularizers.l2(weight_decay)))
+        model.add(Activation(act))
         model.add(BatchNormalization())
 
         model.add(MaxPooling2D(pool_size=(2, 2)))
 
-        model.add(Conv2D(128, (3, 3), padding='same'))
-        model.add(Activation('relu'))
-        model.add(BatchNormalization())
-        model.add(Dropout(0.3))
-
-        model.add(Conv2D(128, (3, 3), padding='same'))
-        model.add(Activation('relu'))
+        model.add(Conv2D(int(128*self.width), (3, 3), padding='same',kernel_regularizer=regularizers.l2(weight_decay)))
+        model.add(Activation(act))
         model.add(BatchNormalization())
 
         model.add(MaxPooling2D(pool_size=(2, 2)))
 
-        model.add(Conv2D(256, (3, 3), padding='same'))
-        model.add(Activation('relu'))
+        model.add(Conv2D(int(256*self.width), (3, 3), padding='same',kernel_regularizer=regularizers.l2(weight_decay)))
+        model.add(Activation(act))
         model.add(BatchNormalization())
-        model.add(Dropout(0.3))
+        model.add(Dropout(self.dropout_rate))
 
-        model.add(Conv2D(256, (3, 3), padding='same'))
-        model.add(Activation('relu'))
-        model.add(BatchNormalization())
-        model.add(Dropout(0.3))
-
-        model.add(Conv2D(256, (3, 3), padding='same'))
-        model.add(Activation('relu'))
+        model.add(Conv2D(int(256*self.width), (3, 3), padding='same',kernel_regularizer=regularizers.l2(weight_decay)))
+        model.add(Activation(act))
         model.add(BatchNormalization())
 
         model.add(MaxPooling2D(pool_size=(2, 2)))
 
 
-        model.add(Conv2D(512, (3, 3), padding='same'))
-        model.add(Activation('relu'))
+        model.add(Conv2D(int(512*self.width), (3, 3), padding='same',kernel_regularizer=regularizers.l2(weight_decay)))
+        model.add(Activation(act))
         model.add(BatchNormalization())
-        model.add(Dropout(0.3))
+        model.add(Dropout(self.dropout_rate))
 
-        model.add(Conv2D(512, (3, 3), padding='same'))
-        model.add(Activation('relu'))
-        model.add(BatchNormalization())
-        model.add(Dropout(0.3))
-
-        model.add(Conv2D(512, (3, 3), padding='same'))
-        model.add(Activation('relu'))
+        model.add(Conv2D(int(512*self.width), (3, 3), padding='same',kernel_regularizer=regularizers.l2(weight_decay)))
+        model.add(Activation(act))
         model.add(BatchNormalization())
 
         model.add(MaxPooling2D(pool_size=(2, 2)))
 
 
-        model.add(Conv2D(512, (3, 3), padding='same'))
-        model.add(Activation('relu'))
+        model.add(Conv2D(int(512*self.width), (3, 3), padding='same',kernel_regularizer=regularizers.l2(weight_decay)))
+        model.add(Activation(act))
         model.add(BatchNormalization())
-        model.add(Dropout(0.3))
+        model.add(Dropout(self.dropout_rate))
 
-        model.add(Conv2D(512, (3, 3), padding='same'))
-        model.add(Activation('relu'))
-        model.add(BatchNormalization())
-        model.add(Dropout(0.3))
-
-        model.add(Conv2D(512, (3, 3), padding='same'))
-        model.add(Activation('relu'))
+        model.add(Conv2D(int(512*self.width), (3, 3), padding='same',kernel_regularizer=regularizers.l2(weight_decay)))
+        model.add(Activation(act))
         model.add(BatchNormalization())
 
         model.add(MaxPooling2D(pool_size=(2, 2)))
-        model.add(Dropout(0.1))
+        model.add(Dropout(self.dropout_rate))
 
         model.add(Flatten())
-        model.add(Dense(512))
-        model.add(Activation('relu'))
+        model.add(Dense(int(512*self.width),kernel_regularizer=regularizers.l2(weight_decay)))
+        model.add(Activation(act))
         model.add(BatchNormalization())
 
-        model.add(Dropout(0.1))
+        model.add(Dropout(self.dropout_rate))
         model.add(Dense(self.num_classes))
         model.add(Activation('softmax'))
         return model
@@ -132,12 +114,27 @@ class cifar10vgg:
         X_test = (X_test-mean)/(std+1e-7)
         return X_train, X_test
 
+    def normalize_production(self,x):
+        #this function is used to normalize instances in production according to saved training set statistics
+        # Input: X - a training set
+        # Output X - a normalized training set according to normalization constants.
+
+        #these values produced during first training and are general for the standard cifar10 training set normalization
+        mean = 120.707
+        std = 64.15
+        return (x-mean)/(std+1e-7)
+
+    def predict(self,x,normalize=True,batch_size=50):
+        if normalize:
+            x = self.normalize_production(x)
+        return self.model.predict(x,batch_size)
+
     def train(self,model):
 
         #training parameters
-        batch_size = 128
+        batch_size = self.batch_size
         maxepoches = 190
-        learning_rate = 0.1
+        learning_rate = self.lr
         lr_decay = 1e-6
         lr_drop = 20
         # The data, shuffled and split between train and test sets:
@@ -180,8 +177,7 @@ class cifar10vgg:
         historytemp = model.fit_generator(datagen.flow(x_train, y_train,
                                          batch_size=batch_size),
                             steps_per_epoch=x_train.shape[0] // batch_size,
-                            epochs=maxepoches,validation_data=(x_test, y_test),callbacks=[reduce_lr,save_weights.save_weights(fname='rawdata/vgg16_dropout')],verbose=2)
-        
+                            epochs=maxepoches,validation_data=(x_test, y_test),callbacks=[reduce_lr,save_weights.save_weights(fname='rawdata/vgg11_relu/'+str(self.lr)+'_'+str(self.dropout_rate)+'_'+str(self.width)+'_'+str(self.batch_size)+'_'+str(self.weight_decay)+'_'+str(self.act))],verbose=2)
         return model
         
 
@@ -190,8 +186,28 @@ if __name__ == '__main__':
     config = tf.ConfigProto()
     config.gpu_options.per_process_gpu_memory_fraction = 0.85
     session = tf.Session(config=config)
+
+    act = ['relu', 'tanh']
+    depth = [11, 16, 19]
     
-    for i in range(1):
-        K.clear_session()
-        print('##########################################'+str(i)+'########################################')
-        model = cifar10vgg(index=i)
+    lr_ = [0.1, 0.03]
+    drop_rate_ = [0.0, 0.15, 0.3]
+    width_ = [1., 0.5]
+    batch_size_ = [64, 256]
+    weight_decay_ = [0.0, 0.0005]
+    
+    for weight_decay in weight_decay_:
+        for drop_rate in drop_rate_:
+            for width in width_:
+                for batch_size in batch_size_:
+                    for lr in lr_:
+                        K.clear_session()
+                        print('#############################')
+                        print('#############################')
+                        print('#############################')
+                        print('#############################')
+                        print('#############################')
+                        print('#############################')
+                        model = cifar10vgg(lr, drop_rate, width, batch_size, weight_decay)
+                        
+                        
